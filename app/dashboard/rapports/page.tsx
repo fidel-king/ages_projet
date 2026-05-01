@@ -15,17 +15,20 @@ import { JOURS_PASSAGE, NIVEAUX_ALPHABETISATION } from "@/lib/data/constants";
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
 export default function RapportsPage() {
-  const { data: auditeurs } = useAuditeurs();
-  const { data: formateurs } = useFormateurs();
-  const { data: groupes } = useGroupes();
-  const { data: presences } = usePresences();
-  const { data: salles } = useSalles();
+  const { auditeurs, loading: loadingAuditeurs } = useAuditeurs();
+  const { formateurs, loading: loadingFormateurs } = useFormateurs();
+  const { groupes, loading: loadingGroupes } = useGroupes();
+  const { presences, loading: loadingPresences } = usePresences();
+  const { salles, loading: loadingSalles } = useSalles();
+  
+  const isLoading = loadingAuditeurs || loadingFormateurs || loadingGroupes || loadingPresences || loadingSalles;
   
   const [selectedGroupe, setSelectedGroupe] = useState<string>("all");
   const [selectedPeriode, setSelectedPeriode] = useState<string>("semaine");
 
   // Stats globales
   const stats = useMemo(() => {
+    if (!auditeurs || !presences) return { totalAuditeurs: 0, tauxPresence: 0, tauxAbsence: 0, tauxRetard: 0, auditeursEnAlerte: 0 };
     const totalAuditeurs = auditeurs.filter(a => a.statut === "actif").length;
     const totalPresences = presences.filter(p => p.statut === "present").length;
     const totalAbsences = presences.filter(p => p.statut === "absent").length;
@@ -46,6 +49,7 @@ export default function RapportsPage() {
 
   // Stats par groupe
   const statsParGroupe = useMemo(() => {
+    if (!groupes || !auditeurs || !presences) return [];
     return groupes.map(groupe => {
       const auditeursGroupe = auditeurs.filter(a => a.groupeId === groupe.id);
       const presencesGroupe = presences.filter(p => 
@@ -68,6 +72,7 @@ export default function RapportsPage() {
 
   // Stats par jour
   const statsParJour = useMemo(() => {
+    if (!presences) return [];
     return JOURS_PASSAGE.map(jour => {
       const presencesJour = presences.filter(p => p.jour === jour);
       const presents = presencesJour.filter(p => p.statut === "present").length;
@@ -86,6 +91,7 @@ export default function RapportsPage() {
 
   // Stats par niveau
   const statsParNiveau = useMemo(() => {
+    if (!groupes || !auditeurs || !presences) return [];
     return NIVEAUX_ALPHABETISATION.map(niveau => {
       const groupesNiveau = groupes.filter(g => g.niveau === niveau);
       const auditeursNiveau = auditeurs.filter(a => 
@@ -107,6 +113,7 @@ export default function RapportsPage() {
 
   // Auditeurs avec alertes (3+ absences)
   const auditeursEnAlerte = useMemo(() => {
+    if (!auditeurs || !presences || !groupes) return [];
     return auditeurs
       .map(auditeur => {
         const presencesAuditeur = presences.filter(p => p.auditeurId === auditeur.id);
@@ -140,6 +147,17 @@ export default function RapportsPage() {
     link.download = `rapport_presences_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Chargement des rapports...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
